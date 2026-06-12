@@ -118,33 +118,6 @@ button {
   color: #b8bdc4;
 }
 
-.ticket-link {
-  position: fixed;
-  left: 50%;
-  bottom: calc(max(14px, env(safe-area-inset-bottom)) + 128px);
-  transform: translateX(-50%);
-  z-index: 20;
-  text-decoration: none;
-  color: #778391;
-  background: rgba(255,255,255,0.86);
-  border: 1px solid rgba(225,232,238,0.9);
-  border-radius: 999px;
-  padding: 11px 18px;
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  box-shadow: 0 14px 36px rgba(150,165,180,0.14);
-  backdrop-filter: blur(18px);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity .8s ease, transform .8s ease;
-}
-
-.ticket-link.show {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateX(-50%) translateY(-6px);
-}
-
 @media (orientation: landscape) and (max-height: 600px) {
   .ui {
     flex-direction: row;
@@ -154,17 +127,6 @@ button {
   .note-row,
   .control-row {
     flex-wrap: nowrap;
-  }
-
-  .ticket-link {
-    right: 18px;
-    left: auto;
-    bottom: 88px;
-    transform: none;
-  }
-
-  .ticket-link.show {
-    transform: translateY(-6px);
   }
 }
 
@@ -195,19 +157,18 @@ button {
 <div class="title">Music Crossroad 2026</div>
 <div class="subtitle">sound becomes color, color becomes wings</div>
 
-<a id="ticketLink" class="ticket-link" href="https://teket.jp/17670/66672" target="_blank">
-  🎫 チケットはこちら
-</a>
-
 <div class="ui">
   <div class="note-row" id="noteButtons"></div>
   <div class="control-row" id="controlButtons"></div>
 </div>
 
 <script>
+const TICKET_URL = "https://teket.jp/17670/66672";
+
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
-const ticketLink = document.getElementById("ticketLink");
+
+let ticketButtonArea = null;
 
 let w, h, dpr;
 
@@ -305,7 +266,7 @@ clearBtn.onclick = () => {
   finalAlpha = 0;
   stageMessage = "";
   stageMessageAlpha = 0;
-  ticketLink.classList.remove("show");
+  ticketButtonArea = null;
   stopAllSounds();
 };
 controlButtons.appendChild(clearBtn);
@@ -373,10 +334,11 @@ function showFinalStage() {
   stageMessage = "";
   stageMessageAlpha = 0;
   burstParticles(w / 2, h * 0.45);
-  setTimeout(() => ticketLink.classList.add("show"), 1800);
 }
 
 function drawStage() {
+  ticketButtonArea = null;
+
   if (stageMessageAlpha > 0) {
     ctx.save();
     ctx.globalAlpha = stageMessageAlpha;
@@ -403,17 +365,44 @@ function drawStage() {
     ctx.globalAlpha = finalAlpha;
     ctx.textAlign = "center";
 
+    const centerY = h * 0.40;
+
     ctx.fillStyle = "#788492";
     ctx.font = "300 26px 'Helvetica Neue', sans-serif";
-    ctx.fillText("Music Crossroad 2026", w / 2, h * 0.44);
+    ctx.fillText("Music Crossroad 2026", w / 2, centerY);
 
     ctx.fillStyle = "#a8b0ba";
     ctx.font = "300 14px 'Helvetica Neue', sans-serif";
-    ctx.fillText("音楽は、人と人をつなぐ", w / 2, h * 0.44 + 34);
+    ctx.fillText("音楽は、人と人をつなぐ", w / 2, centerY + 34);
 
     ctx.fillStyle = "#c0c7cf";
     ctx.font = "300 11px 'Helvetica Neue', sans-serif";
-    ctx.fillText("2026.6.27", w / 2, h * 0.44 + 58);
+    ctx.fillText("2026.6.27", w / 2, centerY + 58);
+
+    const btnW = 186;
+    const btnH = 42;
+    const btnX = w / 2 - btnW / 2;
+    const btnY = centerY + 78;
+
+    ctx.globalAlpha = finalAlpha;
+    ctx.fillStyle = "rgba(255,255,255,0.88)";
+    ctx.strokeStyle = "rgba(210,220,230,0.95)";
+    ctx.lineWidth = 1;
+
+    roundRect(ctx, btnX, btnY, btnW, btnH, 24);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = "#7d8995";
+    ctx.font = "300 13px 'Helvetica Neue', sans-serif";
+    ctx.fillText("🎫 チケットはこちら", w / 2, btnY + 27);
+
+    ticketButtonArea = {
+      x: btnX,
+      y: btnY,
+      w: btnW,
+      h: btnH
+    };
 
     ctx.restore();
   }
@@ -447,6 +436,20 @@ function drawRainbow() {
   });
 
   ctx.restore();
+}
+
+function roundRect(ctx, x, y, width, height, radius) {
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(x + width - radius, y);
+  ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+  ctx.lineTo(x + width, y + height - radius);
+  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+  ctx.lineTo(x + radius, y + height);
+  ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+  ctx.lineTo(x, y + radius);
+  ctx.quadraticCurveTo(x, y, x + radius, y);
+  ctx.closePath();
 }
 
 /* ---------- Audio ---------- */
@@ -747,6 +750,20 @@ function getNoteForPointer() {
 
 canvas.addEventListener("pointerdown", e => {
   e.preventDefault();
+
+  if (finalVisible && ticketButtonArea) {
+    const inside =
+      e.clientX >= ticketButtonArea.x &&
+      e.clientX <= ticketButtonArea.x + ticketButtonArea.w &&
+      e.clientY >= ticketButtonArea.y &&
+      e.clientY <= ticketButtonArea.y + ticketButtonArea.h;
+
+    if (inside) {
+      window.open(TICKET_URL, "_blank");
+      return;
+    }
+  }
+
   canvas.setPointerCapture?.(e.pointerId);
 
   const note = getNoteForPointer();
