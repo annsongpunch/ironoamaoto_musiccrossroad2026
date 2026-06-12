@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#ffffff">
+<title>Music Crossroad 2026</title>
+
+<style>
+html, body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #fff;
+  font-family: "Helvetica Neue", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+  touch-action: none;
+  overscroll-behavior: none;
+  user-select: none;
+}
+
+canvas {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  background: #fff;
+  touch-action: none;
+}
+
+.title {
+  position: fixed;
+  top: max(22px, env(safe-area-inset-top));
+  left: 24px;
+  letter-spacing: 0.12em;
+  font-size: 17px;
+  font-weight: 300;
+  color: #aeb6bf;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.subtitle {
+  position: fixed;
+  top: calc(max(22px, env(safe-area-inset-top)) + 28px);
+  left: 26px;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: #d0d5da;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.ui {
+  position: fixed;
+  left: 50%;
+  bottom: max(14px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  align-items: center;
+  background: rgba(255,255,255,0.78);
+  padding: 11px 13px;
+  border-radius: 26px;
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(225,232,238,0.8);
+  box-shadow: 0 18px 45px rgba(150,165,180,0.13);
+  z-index: 10;
+  max-width: calc(100vw - 20px);
+}
+
+.note-row,
+.control-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+button {
+  border: 1px solid rgba(225,230,236,0.9);
+  background: rgba(255,255,255,0.78);
+  color: #aeb5bd;
+  border-radius: 999px;
+  padding: 8px 11px;
+  cursor: pointer;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.color {
+  width: 35px;
+  height: 35px;
+  min-width: 35px;
+  padding: 0;
+  border-radius: 50%;
+  color: rgba(255,255,255,0.94);
+  font-size: 9px;
+  font-weight: 500;
+  text-shadow: 0 1px 5px rgba(70,80,90,0.25);
+}
+
+.selected {
+  outline: 3px solid rgba(190,202,214,0.36);
+  transform: translateY(-2px);
+}
+
+.volume {
+  width: 78px;
+  accent-color: #b8bdc4;
+}
+
+.volume-label {
+  font-size: 10px;
+  color: #b8bdc4;
+}
+
+.ticket-link {
+  position: fixed;
+  left: 50%;
+  bottom: calc(max(14px, env(safe-area-inset-bottom)) + 128px);
+  transform: translateX(-50%);
+  z-index: 20;
+  text-decoration: none;
+  color: #778391;
+  background: rgba(255,255,255,0.86);
+  border: 1px solid rgba(225,232,238,0.9);
+  border-radius: 999px;
+  padding: 11px 18px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  box-shadow: 0 14px 36px rgba(150,165,180,0.14);
+  backdrop-filter: blur(18px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .8s ease, transform .8s ease;
+}
+
+.ticket-link.show {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(-6px);
+}
+
+@media (orientation: landscape) and (max-height: 600px) {
+  .ui {
+    flex-direction: row;
+    border-radius: 999px;
+  }
+
+  .note-row,
+  .control-row {
+    flex-wrap: nowrap;
+  }
+
+  .ticket-link {
+    right: 18px;
+    left: auto;
+    bottom: 88px;
+    transform: none;
+  }
+
+  .ticket-link.show {
+    transform: translateY(-6px);
+  }
+}
+
+@media (min-width: 900px) {
+  .ui {
+    flex-direction: row;
+    border-radius: 999px;
+  }
+
+  .note-row,
+  .control-row {
+    flex-wrap: nowrap;
+  }
+
+  .color {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<canvas id="canvas"></canvas>
+
+<div class="title">Music Crossroad 2026</div>
+<div class="subtitle">sound becomes color, color becomes wings</div>
+
+<a id="ticketLink" class="ticket-link" href="https://teket.jp/17670/66672" target="_blank">
+  🎫 チケットはこちら
+</a>
+
+<div class="ui">
+  <div class="note-row" id="noteButtons"></div>
+  <div class="control-row" id="controlButtons"></div>
+</div>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const ticketLink = document.getElementById("ticketLink");
+
+let w, h, dpr;
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  w = window.innerWidth;
+  h = window.innerHeight;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+resize();
+window.addEventListener("resize", resize);
+window.addEventListener("orientationchange", () => setTimeout(resize, 300));
+
+const notes = [
+  { name: "ド", key: "a", color: "#ff7b7b", freq: 261.63 },
+  { name: "レ", key: "s", color: "#ffe680", freq: 293.66 },
+  { name: "ミ", key: "d", color: "#91e6a3", freq: 329.63 },
+  { name: "ファ", key: "f", color: "#ffb36b", freq: 349.23 },
+  { name: "ソ", key: "g", color: "#8ed8ff", freq: 392.00 },
+  { name: "ラ", key: "h", color: "#bca7ff", freq: 440.00 },
+  { name: "シ", key: "j", color: "#ffb3cf", freq: 493.88 },
+  { name: "高ド", key: "k", color: "#ff8f8f", freq: 523.25 }
+];
+
+let current = notes[0];
+let mode = "normal";
+let volume = 0.85;
+
+let birds = [];
+let particles = [];
+let ripples = [];
+let rainbowAlpha = 0;
+
+let birdCount = 0;
+let stageMessage = "";
+let stageMessageAlpha = 0;
+let finalVisible = false;
+let finalAlpha = 0;
+
+const activePointers = new Map();
+
+const birdImage = new Image();
+birdImage.src = "bird.png";
+
+const noteButtons = document.getElementById("noteButtons");
+const controlButtons = document.getElementById("controlButtons");
+
+notes.forEach(note => {
+  const btn = document.createElement("button");
+  btn.className = "color";
+  btn.textContent = note.name;
+  btn.style.background = note.color;
+
+  btn.onclick = () => {
+    mode = "normal";
+    current = note;
+    updateSelected();
+    playTap(note);
+    spawnBird(w / 2, h * 0.65, note);
+  };
+
+  noteButtons.appendChild(btn);
+  note.button = btn;
+});
+
+const randomBtn = document.createElement("button");
+randomBtn.textContent = "Random";
+randomBtn.onclick = () => {
+  mode = "random";
+  current = randomNote();
+  updateSelected();
+};
+controlButtons.appendChild(randomBtn);
+
+const chordBtn = document.createElement("button");
+chordBtn.textContent = "Chord";
+chordBtn.onclick = () => {
+  mode = "chord";
+  current = randomNote();
+  updateSelected();
+};
+controlButtons.appendChild(chordBtn);
+
+const clearBtn = document.createElement("button");
+clearBtn.textContent = "Clear";
+clearBtn.onclick = () => {
+  birds = [];
+  particles = [];
+  ripples = [];
+  birdCount = 0;
+  rainbowAlpha = 0;
+  finalVisible = false;
+  finalAlpha = 0;
+  stageMessage = "";
+  stageMessageAlpha = 0;
+  ticketLink.classList.remove("show");
+  stopAllSounds();
+};
+controlButtons.appendChild(clearBtn);
+
+const fullBtn = document.createElement("button");
+fullBtn.textContent = "Full";
+fullBtn.onclick = () => {
+  const el = document.documentElement;
+  if (!document.fullscreenElement && el.requestFullscreen) el.requestFullscreen();
+  else if (document.exitFullscreen) document.exitFullscreen();
+};
+controlButtons.appendChild(fullBtn);
+
+const volumeLabel = document.createElement("span");
+volumeLabel.className = "volume-label";
+volumeLabel.textContent = "Vol";
+controlButtons.appendChild(volumeLabel);
+
+const volumeSlider = document.createElement("input");
+volumeSlider.className = "volume";
+volumeSlider.type = "range";
+volumeSlider.min = 0;
+volumeSlider.max = 1;
+volumeSlider.step = 0.01;
+volumeSlider.value = volume;
+volumeSlider.oninput = e => volume = Number(e.target.value);
+controlButtons.appendChild(volumeSlider);
+
+function updateSelected() {
+  notes.forEach(n => n.button.classList.remove("selected"));
+  current.button.classList.add("selected");
+}
+
+function randomNote() {
+  return notes[Math.floor(Math.random() * notes.length)];
+}
+
+updateSelected();
+
+/* ---------- Stage ---------- */
+function advanceStage() {
+  birdCount++;
+
+  if (birdCount === 5) {
+    showStageMessage("風が集まる");
+  }
+
+  if (birdCount === 10) {
+    showStageMessage("音が重なる");
+    burstParticles(w / 2, h * 0.45);
+  }
+
+  if (birdCount === 15) {
+    showFinalStage();
+  }
+}
+
+function showStageMessage(text) {
+  stageMessage = text;
+  stageMessageAlpha = 1;
+}
+
+function showFinalStage() {
+  finalVisible = true;
+  stageMessage = "";
+  stageMessageAlpha = 0;
+  burstParticles(w / 2, h * 0.45);
+  setTimeout(() => ticketLink.classList.add("show"), 1800);
+}
+
+function drawStage() {
+  if (stageMessageAlpha > 0) {
+    ctx.save();
+    ctx.globalAlpha = stageMessageAlpha;
+    ctx.fillStyle = "#9aa5b1";
+    ctx.textAlign = "center";
+    ctx.font = "300 22px 'Helvetica Neue', sans-serif";
+    ctx.fillText(stageMessage, w / 2, h * 0.38);
+    ctx.restore();
+
+    stageMessageAlpha *= 0.975;
+  }
+
+  if (finalVisible) {
+    finalAlpha += (1 - finalAlpha) * 0.025;
+    rainbowAlpha += (1 - rainbowAlpha) * 0.018;
+  }
+
+  if (rainbowAlpha > 0.01) {
+    drawRainbow();
+  }
+
+  if (finalAlpha > 0.01) {
+    ctx.save();
+    ctx.globalAlpha = finalAlpha;
+    ctx.textAlign = "center";
+
+    ctx.fillStyle = "#788492";
+    ctx.font = "300 26px 'Helvetica Neue', sans-serif";
+    ctx.fillText("Music Crossroad 2026", w / 2, h * 0.44);
+
+    ctx.fillStyle = "#a8b0ba";
+    ctx.font = "300 14px 'Helvetica Neue', sans-serif";
+    ctx.fillText("音楽は、人と人をつなぐ", w / 2, h * 0.44 + 34);
+
+    ctx.fillStyle = "#c0c7cf";
+    ctx.font = "300 11px 'Helvetica Neue', sans-serif";
+    ctx.fillText("2026.6.27", w / 2, h * 0.44 + 58);
+
+    ctx.restore();
+  }
+}
+
+function drawRainbow() {
+  const cx = w / 2;
+  const cy = h * 0.78;
+  const baseR = Math.min(w * 0.42, 260);
+
+  const rainbow = [
+    "#ff7b7b",
+    "#ffb36b",
+    "#ffe680",
+    "#91e6a3",
+    "#8ed8ff",
+    "#bca7ff",
+    "#ffb3cf"
+  ];
+
+  ctx.save();
+  ctx.globalAlpha = 0.22 * rainbowAlpha;
+  ctx.lineCap = "round";
+
+  rainbow.forEach((color, i) => {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 10;
+    ctx.beginPath();
+    ctx.arc(cx, cy, baseR - i * 14, Math.PI * 1.12, Math.PI * 1.88);
+    ctx.stroke();
+  });
+
+  ctx.restore();
+}
+
+/* ---------- Audio ---------- */
+let audioCtx;
+let oldSounds = [];
+
+function initAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === "suspended") audioCtx.resume();
+}
+
+function createSoftGlass(freq) {
+  initAudio();
+
+  const osc1 = audioCtx.createOscillator();
+  const osc2 = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  const filter = audioCtx.createBiquadFilter();
+
+  osc1.type = "sine";
+  osc2.type = "sine";
+  osc1.frequency.value = freq;
+  osc2.frequency.value = freq * 2.01;
+
+  filter.type = "lowpass";
+  filter.frequency.value = 1700;
+  filter.Q.value = 2;
+
+  gain.gain.value = 0.0001;
+
+  osc1.connect(filter);
+  osc2.connect(filter);
+  filter.connect(gain);
+  gain.connect(audioCtx.destination);
+
+  osc1.start();
+  osc2.start();
+
+  return { osc1, osc2, gain };
+}
+
+function playTap(note) {
+  initAudio();
+
+  const freqs = mode === "chord"
+    ? [note.freq, note.freq * 1.25, note.freq * 1.5]
+    : [note.freq];
+
+  const vol = (mode === "chord" ? 0.035 : 0.11) * volume;
+  const dur = mode === "chord" ? 2.0 : 1.4;
+
+  freqs.forEach(freq => {
+    const v = createSoftGlass(freq);
+    v.gain.gain.exponentialRampToValueAtTime(Math.max(vol, 0.0001), audioCtx.currentTime + 0.06);
+    v.gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur);
+    v.osc1.stop(audioCtx.currentTime + dur + 0.1);
+    v.osc2.stop(audioCtx.currentTime + dur + 0.1);
+    oldSounds.push(v);
+  });
+
+  fadeOldSounds();
+}
+
+function startPointerSound(pointerId, note) {
+  initAudio();
+
+  const freqs = mode === "chord"
+    ? [note.freq, note.freq * 1.25, note.freq * 1.5]
+    : [note.freq];
+
+  const vol = (mode === "chord" ? 0.026 : 0.085) * volume;
+
+  return freqs.map(freq => {
+    const v = createSoftGlass(freq);
+    v.gain.gain.exponentialRampToValueAtTime(Math.max(vol, 0.0001), audioCtx.currentTime + 0.18);
+    return v;
+  });
+}
+
+function stopPointerSound(pointerId) {
+  if (!audioCtx) return;
+  const data = activePointers.get(pointerId);
+  if (!data || !data.voices) return;
+
+  data.voices.forEach(v => {
+    try {
+      v.gain.gain.cancelScheduledValues(audioCtx.currentTime);
+      v.gain.gain.setValueAtTime(Math.max(v.gain.gain.value, 0.0001), audioCtx.currentTime);
+      v.gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.8);
+      v.osc1.stop(audioCtx.currentTime + 0.95);
+      v.osc2.stop(audioCtx.currentTime + 0.95);
+    } catch(e) {}
+  });
+}
+
+function stopAllSounds() {
+  for (const pointerId of activePointers.keys()) stopPointerSound(pointerId);
+  activePointers.clear();
+}
+
+function fadeOldSounds() {
+  while (oldSounds.length > 5) {
+    const old = oldSounds.shift();
+    if (audioCtx) old.gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.35);
+  }
+}
+
+/* ---------- Birds ---------- */
+function spawnBird(x, y, note) {
+  advanceStage();
+
+  const dir = Math.random() > 0.5 ? 1 : -1;
+
+  birds.push({
+    x,
+    y,
+    vx: dir * (1.3 + Math.random() * 1.4),
+    vy: -2.6 - Math.random() * 1.6,
+    size: 64 + Math.random() * 28,
+    color: note.color,
+    alpha: 1,
+    life: 1,
+    flap: Math.random() * Math.PI * 2,
+    rot: dir * (0.08 + Math.random() * 0.12),
+    dir
+  });
+
+  addRipple(x, y, note.color);
+
+  for (let i = 0; i < 18; i++) {
+    particles.push({
+      x,
+      y,
+      vx: (Math.random() - 0.5) * 2.2,
+      vy: Math.random() * 1.8 + 0.5,
+      r: Math.random() * 4 + 2,
+      color: note.color,
+      alpha: 0.18,
+      life: 1
+    });
+  }
+}
+
+function drawBirds() {
+  birds.forEach((b, index) => {
+    b.x += b.vx;
+    b.y += b.vy;
+    b.vy += 0.018;
+    b.flap += 0.18;
+    b.life *= 0.992;
+    b.alpha = b.life;
+
+    const flapScale = 1 + Math.sin(b.flap) * 0.08;
+
+    ctx.save();
+    ctx.translate(b.x, b.y);
+    ctx.rotate(b.rot * Math.sin(b.flap * 0.4));
+    ctx.scale(b.dir, 1);
+
+    const s = b.size * flapScale;
+
+    ctx.globalAlpha = b.alpha;
+    ctx.globalCompositeOperation = "source-over";
+
+    if (birdImage.complete && birdImage.naturalWidth > 0) {
+      const off = document.createElement("canvas");
+      off.width = birdImage.naturalWidth;
+      off.height = birdImage.naturalHeight;
+      const octx = off.getContext("2d");
+
+      octx.drawImage(birdImage, 0, 0);
+      octx.globalCompositeOperation = "source-in";
+      octx.fillStyle = b.color;
+      octx.fillRect(0, 0, off.width, off.height);
+
+      ctx.drawImage(off, -s / 2, -s / 2, s, s);
+    } else {
+      ctx.fillStyle = b.color;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, s * 0.42, s * 0.24, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.globalAlpha = 1;
+    ctx.restore();
+
+    if (b.life < 0.08 || b.y < -120 || b.x < -160 || b.x > w + 160) {
+      birds.splice(index, 1);
+    }
+  });
+}
+
+/* ---------- Effects ---------- */
+function addRipple(x, y, color) {
+  for (let i = 0; i < 3; i++) {
+    ripples.push({
+      x, y,
+      r: i * 10,
+      maxR: 120 + Math.random() * 70,
+      alpha: 0.13 - i * 0.03,
+      color,
+      speed: 1.6 + i * 0.3,
+      wobble: Math.random() * Math.PI * 2,
+      life: 1
+    });
+  }
+}
+
+function drawRipples() {
+  ripples.forEach((ripple, index) => {
+    ripple.r += ripple.speed;
+    ripple.life *= 0.982;
+    ripple.wobble += 0.035;
+
+    const alpha = ripple.alpha * ripple.life * (1 - ripple.r / ripple.maxR);
+    if (alpha <= 0 || ripple.r > ripple.maxR) {
+      ripples.splice(index, 1);
+      return;
+    }
+
+    ctx.globalCompositeOperation = "source-over";
+    ctx.strokeStyle = rgba(ripple.color, alpha);
+    ctx.lineWidth = 1.1;
+    ctx.beginPath();
+
+    const points = 88;
+    for (let i = 0; i <= points; i++) {
+      const a = (Math.PI * 2 * i) / points;
+      const wave = Math.sin(a * 5 + ripple.wobble) * 1.5;
+      const rr = ripple.r + wave;
+      const x = ripple.x + Math.cos(a) * rr;
+      const y = ripple.y + Math.sin(a) * rr * 0.92;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+
+    ctx.stroke();
+  });
+}
+
+function burstParticles(x, y) {
+  notes.forEach(note => {
+    for (let i = 0; i < 8; i++) {
+      particles.push({
+        x,
+        y,
+        vx: (Math.random() - 0.5) * 4,
+        vy: (Math.random() - 0.5) * 4,
+        r: Math.random() * 5 + 2,
+        color: note.color,
+        alpha: 0.22,
+        life: 1
+      });
+    }
+  });
+}
+
+function drawParticles() {
+  particles.forEach((p, index) => {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life *= 0.965;
+    p.r *= 1.01;
+
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = rgba(p.color, p.alpha * p.life);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (p.life < 0.04) particles.splice(index, 1);
+  });
+}
+
+function draw() {
+  ctx.clearRect(0, 0, w, h);
+  drawRipples();
+  drawParticles();
+  drawBirds();
+  drawStage();
+  requestAnimationFrame(draw);
+}
+
+function rgba(hex, alpha) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+draw();
+
+/* ---------- Interaction ---------- */
+function getNoteForPointer() {
+  if (mode === "random" || mode === "chord") return randomNote();
+  return current;
+}
+
+canvas.addEventListener("pointerdown", e => {
+  e.preventDefault();
+  canvas.setPointerCapture?.(e.pointerId);
+
+  const note = getNoteForPointer();
+  current = note;
+  updateSelected();
+
+  const voices = startPointerSound(e.pointerId, note);
+
+  activePointers.set(e.pointerId, {
+    note,
+    voices,
+    lastSpawnTime: Date.now(),
+    moved: false
+  });
+
+  spawnBird(e.clientX, e.clientY, note);
+});
+
+canvas.addEventListener("pointermove", e => {
+  e.preventDefault();
+
+  const data = activePointers.get(e.pointerId);
+  if (!data) return;
+
+  data.moved = true;
+
+  const now = Date.now();
+  if (now - data.lastSpawnTime > 180) {
+    spawnBird(e.clientX, e.clientY, data.note);
+    data.lastSpawnTime = now;
+  }
+});
+
+function endPointer(e) {
+  e.preventDefault();
+
+  const data = activePointers.get(e.pointerId);
+  if (!data) return;
+
+  if (!data.moved) playTap(data.note);
+
+  stopPointerSound(e.pointerId);
+  activePointers.delete(e.pointerId);
+}
+
+canvas.addEventListener("pointerup", endPointer);
+canvas.addEventListener("pointercancel", endPointer);
+canvas.addEventListener("lostpointercapture", endPointer);
+
+window.addEventListener("blur", stopAllSounds);
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) stopAllSounds();
+});
+
+window.addEventListener("keydown", e => {
+  const note = notes.find(n => n.key === e.key.toLowerCase());
+  if (!note) return;
+
+  mode = "normal";
+  current = note;
+  updateSelected();
+
+  playTap(note);
+  spawnBird(Math.random() * w, h * 0.7, note);
+});
+</script>
+
+</body>
+</html>
