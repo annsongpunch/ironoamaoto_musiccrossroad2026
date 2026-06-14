@@ -169,6 +169,7 @@ const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
 let ticketButtonArea = null;
+let introVisible = true;
 
 let w, h, dpr;
 
@@ -196,7 +197,7 @@ const notes = [
 ];
 
 let current = notes[0];
-let mode = "normal";
+let mode = "random";
 let volume = 0.85;
 
 let birds = [];
@@ -225,6 +226,7 @@ notes.forEach(note => {
   btn.style.background = note.color;
 
   btn.onclick = () => {
+    introVisible = false;
     mode = "normal";
     current = note;
     updateSelected();
@@ -239,6 +241,7 @@ notes.forEach(note => {
 const randomBtn = document.createElement("button");
 randomBtn.textContent = "Random";
 randomBtn.onclick = () => {
+  introVisible = false;
   mode = "random";
   current = randomNote();
   updateSelected();
@@ -248,6 +251,7 @@ controlButtons.appendChild(randomBtn);
 const chordBtn = document.createElement("button");
 chordBtn.textContent = "Chord";
 chordBtn.onclick = () => {
+  introVisible = false;
   mode = "chord";
   current = randomNote();
   updateSelected();
@@ -257,6 +261,7 @@ controlButtons.appendChild(chordBtn);
 const clearBtn = document.createElement("button");
 clearBtn.textContent = "Clear";
 clearBtn.onclick = () => {
+  introVisible = true;
   birds = [];
   particles = [];
   ripples = [];
@@ -274,6 +279,7 @@ controlButtons.appendChild(clearBtn);
 const fullBtn = document.createElement("button");
 fullBtn.textContent = "Full";
 fullBtn.onclick = () => {
+  introVisible = false;
   const el = document.documentElement;
   if (!document.fullscreenElement && el.requestFullscreen) el.requestFullscreen();
   else if (document.exitFullscreen) document.exitFullscreen();
@@ -305,6 +311,30 @@ function randomNote() {
 }
 
 updateSelected();
+
+/* ---------- Intro ---------- */
+function drawIntro() {
+  if (!introVisible) return;
+
+  const blink = 0.45 + Math.sin(Date.now() * Math.PI / 1000) * 0.28;
+
+  ctx.save();
+  ctx.textAlign = "center";
+
+  ctx.globalAlpha = blink;
+  ctx.fillStyle = "#8f9aa5";
+  ctx.font = "300 34px 'Helvetica Neue', sans-serif";
+  ctx.fillText("TAP", w / 2, h * 0.42);
+
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = "#c0c7cf";
+  ctx.font = "300 12px 'Helvetica Neue', sans-serif";
+  ctx.fillText("chord = 和音", w / 2, h * 0.42 + 44);
+  ctx.fillText("random = ランダム", w / 2, h * 0.42 + 66);
+  ctx.fillText("clear = リセット", w / 2, h * 0.42 + 88);
+
+  ctx.restore();
+}
 
 /* ---------- Stage ---------- */
 function advanceStage() {
@@ -730,6 +760,7 @@ function draw() {
   drawParticles();
   drawBirds();
   drawStage();
+  drawIntro();
   requestAnimationFrame(draw);
 }
 
@@ -750,6 +781,10 @@ function getNoteForPointer() {
 
 canvas.addEventListener("pointerdown", e => {
   e.preventDefault();
+
+  if (introVisible) {
+    introVisible = false;
+  }
 
   if (finalVisible && ticketButtonArea) {
     const inside =
@@ -822,6 +857,7 @@ window.addEventListener("keydown", e => {
   const note = notes.find(n => n.key === e.key.toLowerCase());
   if (!note) return;
 
+  introVisible = false;
   mode = "normal";
   current = note;
   updateSelected();
